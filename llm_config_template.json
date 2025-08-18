@@ -1,0 +1,6 @@
+{
+  "gemini_api_key": "YOUR_GEMINI_API_KEY",
+  "model": "gemini-pro",
+  "max_tokens": 100,
+  "temperature": 0.7
+}

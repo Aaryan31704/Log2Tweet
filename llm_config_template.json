@@ -1,6 +1,6 @@
 {
-  "gemini_api_key": "YOUR_GEMINI_API_KEY",
-  "model": "gemini-pro",
-  "max_tokens": 100,
+  "gemma_api_key": "YOUR_GEMMA_API_KEY",
+  "model": "gemma-2-9b-it",
+  "max_tokens": 1000,
   "temperature": 0.7
 }

@@ -15,21 +15,19 @@ from typing import List, Dict, Optional
 
 # LLM Prompt for generating daily summary
 DAILY_SUMMARY_PROMPT = """
-You are a helpful assistant that creates engaging, tweet-style summaries of daily work progress.
-
-Based on the following list of tasks completed today, create a friendly, motivational tweet that summarizes the day's accomplishments.
+Create a concise, engaging tweet summarizing today's work progress.
 
 Requirements:
-- Keep it under 200 characters (Twitter limit)
-- Use an encouraging, positive tone
-- Include emojis to make it engaging
-- Mention specific achievements when possible
-- Make it feel personal and authentic
+- MAXIMUM 280 characters (Twitter limit)
+- Use encouraging, positive tone
+- Include 2-3 relevant emojis
+- Be specific but brief
+- Make it feel personal and motivational
 
 Today's tasks:
 {tasks_list}
 
-Generate a tweet that captures the essence of today's progress:
+Generate a SHORT tweet (under 280 chars) that captures today's progress:
 """
 
 def load_config(config_file: str) -> Dict:
@@ -66,7 +64,7 @@ def get_todays_tasks(tasks: List[Dict]) -> List[Dict]:
     return [task for task in tasks if task.get('date') == today]
 
 def generate_summary_with_llm(tasks: List[Dict], llm_config: Dict) -> str:
-    """Generate daily summary using Google Gemini API."""
+    """Generate daily summary using Google Gemma API."""
     if not tasks:
         return "No tasks completed today. Time to get started! 💪"
     
@@ -74,20 +72,20 @@ def generate_summary_with_llm(tasks: List[Dict], llm_config: Dict) -> str:
     tasks_text = "\n".join([f"• {task['description']}" for task in tasks])
     
     try:
-        # Try Gemini API first
-        if 'gemini_api_key' in llm_config and llm_config['gemini_api_key']:
-            # Configure Gemini API
-            genai.configure(api_key=llm_config['gemini_api_key'])
+        # Try Gemma API first
+        if 'gemma_api_key' in llm_config and llm_config['gemma_api_key']:
+            # Configure Gemma API
+            genai.configure(api_key=llm_config['gemma_api_key'])
             
             # Get the model
-            model = genai.GenerativeModel(llm_config.get('model', 'gemini-pro'))
+            model = genai.GenerativeModel(llm_config.get('model', 'gemma-2-9b-it'))
             
             # Generate content
             response = model.generate_content(
                 DAILY_SUMMARY_PROMPT.format(tasks_list=tasks_text),
                 generation_config=genai.types.GenerationConfig(
                     temperature=llm_config.get('temperature', 0.7),
-                    max_output_tokens=llm_config.get('max_tokens', 100)
+                    max_output_tokens=llm_config.get('max_tokens', 1000)
                 )
             )
             
@@ -95,9 +93,21 @@ def generate_summary_with_llm(tasks: List[Dict], llm_config: Dict) -> str:
             if hasattr(response, 'text'):
                 return response.text.strip()
             elif hasattr(response, 'parts') and response.parts:
-                return response.parts[0].text.strip()
+                # Handle complex responses with multiple parts
+                text_parts = []
+                for part in response.parts:
+                    if hasattr(part, 'text'):
+                        text_parts.append(part.text)
+                return ' '.join(text_parts).strip()
             elif hasattr(response, 'candidates') and response.candidates:
-                return response.candidates[0].content.parts[0].text.strip()
+                # Handle candidate-based responses
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                    text_parts = []
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'text'):
+                            text_parts.append(part.text)
+                    return ' '.join(text_parts).strip()
             else:
                 # Fallback to string representation
                 return str(response).strip()
@@ -107,7 +117,7 @@ def generate_summary_with_llm(tasks: List[Dict], llm_config: Dict) -> str:
             return generate_fallback_summary(tasks)
             
     except Exception as e:
-        print(f"Warning: Gemini API call failed: {e}")
+        print(f"Warning: Gemma API call failed: {e}")
         print("Using fallback summary generation...")
         return generate_fallback_summary(tasks)
 
@@ -122,7 +132,7 @@ def generate_fallback_summary(tasks: List[Dict]) -> str:
     if task_count == 1:
         return f"✅ Completed: {first_task[:50]}{'...' if len(first_task) > 50 else ''} #Productivity #Progress"
     else:
-        return f"🚀 Made progress on {task_count} tasks today! Including: {first_task[:30]}{'...' if len(first_task) > 30 else ''} #DailyProgress #Productivity"
+        return f"�� Made progress on {task_count} tasks today! Including: {first_task[:30]}{'...' if len(first_task) > 30 else ''} #DailyProgress #Productivity"
 
 def post_to_twitter(summary: str, twitter_config: Dict) -> bool:
     """Post summary to Twitter using Tweepy API v2."""
@@ -176,17 +186,19 @@ def main():
     print(f"📋 Found {len(todays_tasks)} tasks for today")
     
     # Generate summary
-    print("🤖 Generating summary with Gemini...")
+    print("🤖 Generating summary with Gemma...")
     summary = generate_summary_with_llm(todays_tasks, llm_config)
     
     print(f"📝 Generated summary: {summary}")
     print(f"📏 Character count: {len(summary)}")
     
-    # Check character limit
+    # Check character limit and truncate if needed
     if len(summary) > 280:
         print("⚠️  Warning: Summary exceeds Twitter's 280 character limit")
+        print(f"📏 Original length: {len(summary)}")
         summary = summary[:277] + "..."
         print(f"📏 Truncated to: {len(summary)} characters")
+        print(f"📝 Final summary: {summary}")
     
     # Post to Twitter
     print("🐦 Posting to Twitter...")
